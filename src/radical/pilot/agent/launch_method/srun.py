@@ -2,7 +2,7 @@
 __copyright__ = "Copyright 2016, http://radical.rutgers.edu"
 __license__   = "MIT"
 
-
+import math
 import os
 
 import radical.utils as ru
@@ -73,7 +73,7 @@ class Srun(LaunchMethod):
         # use `ALL` to export vars pre_exec and RP, and add task env explicitly
         env = '--export=ALL'
         for k,v in task_env.items():
-            env += ",'%s'='%s'" % (k, v)
+            env += ",%s=%s" % (k, v)
 
 
         # Alas, exact rank-to-core mapping seems only be availabe in Slurm when
@@ -91,7 +91,7 @@ class Srun(LaunchMethod):
         gpus_per_task    = cud['gpu_processes']
 
         # use `--exclusive` to ensure all tasks get individual resources.
-        mapping = '--exclusive --cpu-bind=none '           \
+        mapping = '--exclusive '                           \
                 + '--ntasks %d '        % n_tasks          \
                 + '--cpus-per-task %d ' % threads_per_task \
                 + '--gpus-per-task %d'  % gpus_per_task
@@ -103,10 +103,16 @@ class Srun(LaunchMethod):
             nodelist = [node['name'] for node in slots['nodes']]
             nodefile = '%s/%s.nodes' % (sbox, uid)
             with open(nodefile, 'w') as fout:
-                fout.write(','.join(nodelist))
+                fout.write(','.join(set(nodelist)))
                 fout.write('\n')
 
-            mapping += ' --nodelist=%s' % nodefile
+            mapping += ' --nodes %d'    % len(slots['nodes']) \
+                     + ' --nodelist=%s' % nodefile
+
+        else:
+
+            mapping += ' --nodes %d' % int(
+                math.ceil(n_tasks / float(self._cfg.get('cores_per_node', 1))))
 
         cmd = '%s %s %s %s' % (self.launch_command, mapping, env, task_cmd)
         return cmd, None
