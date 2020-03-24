@@ -222,11 +222,9 @@
         "agent_spawner"               : "POPEN",
         "agent_launch_method"         : "SRUN",
         "task_launch_method"          : "SRUN",
-        "mpi_launch_method"           : "MPIRUN",
+        "mpi_launch_method"           : "SRUN",
         "pre_bootstrap_0"             :["module load TACC",
-                                        "module unload gcc",
                                         "module load gcc/7.3.0",
-                                        "module load python3/3.8.1",
                                         "module load openmpi/3.1.2"
                                         ],
         "default_remote_workdir"      : "$SCRATCH",
@@ -238,7 +236,7 @@
                                          "LMOD_SYSTEM_DEFAULT_MODULES",
                                          "LD_LIBRARY_PATH"
                                         ],
-        "cu_pre_exec"                 : ["module restore"]
+        "cu_pre_exec"                 : []
     },
 
     "stampede2_ssh": {

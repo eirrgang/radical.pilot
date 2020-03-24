@@ -57,26 +57,47 @@ class Srun(LaunchMethod):
     #
     def construct_command(self, cu, launch_script_hop):
 
-        slots        = cu.get('slots')
-        uid          = cu['uid']
-        cud          = cu['description']
-        task_exec    = cud['executable']
-        task_env     = cud.get('environment') or dict()
-        task_args    = cud.get('arguments')   or list()
-        task_argstr  = self._create_arg_string(task_args)
-        sbox         = cu['unit_sandbox_path']
+        slots       = cu.get('slots')
+        cud         = cu['description']
+        task_exec   = cud['executable']
+        task_args   = cud.get('arguments')   or list()
+        task_argstr = self._create_arg_string(task_args)
 
         # construct the task executable and arguments
         if task_argstr: task_cmd = "%s %s" % (task_exec, task_argstr)
         else          : task_cmd = task_exec
 
         # use `ALL` to export vars pre_exec and RP, and add task env explicitly
-        env = '--export=ALL'
-        for k,v in task_env.items():
-            env += ",%s=%s" % (k, v)
+        # env = '--export=ALL'
+        # task_env = cud.get('environment') or dict()
+        # for k,v in task_env.items():
+        #     env += ",%s=%s" % (k, v)
+        # FIXME: skip explicit definition according to HPC's User Guide
+        # (https://portal.tacc.utexas.edu/user-guides/stampede2#running-sbatch)
+        # * environment variables are set at radical.pilot.agent.executing.popen
 
+        n_tasks = cud['cpu_processes']
+        # threads_per_task is defined by OMP_NUM_THREADS
+        # gpus are defined by CUDA_VISIBLE_DEVICES
 
-        # Alas, exact rank-to-core mapping seems only be availabe in Slurm when
+        if slots:
+
+            n_nodes = len(slots['nodes'])
+
+            # the scheduler did place tasks - we can't honor the core and gpu
+            # mapping (see above), but we at least honor the nodelist.
+            nodelist = [node['name'] for node in slots['nodes']]
+            if not cu['description'].get('pre_exec'):
+                cu['description']['pre_exec'] = list()
+            cu['description']['pre_exec'].append(
+                'export SLURM_JOB_NODELIST="%s"' % ','.join(set(nodelist)))
+
+        else:
+
+            n_nodes = int(
+                math.ceil(n_tasks / float(self._cfg.get('cores_per_node', 1))))
+
+        # Alas, exact rank-to-core mapping seems only be available in Slurm when
         # tasks use full nodes - which in RP is rarely the case.  We thus are
         # limited to specifying the list of nodes we want the processes to be
         # placed on, and otherwise have to rely on the `--exclusive` flag to get
@@ -84,39 +105,15 @@ class Srun(LaunchMethod):
         # the task we leave the node placement to srun as well.
         #
         # debug mapping
-        os.environ['SLURM_CPU_BIND'] = 'verbose'
-
-        n_tasks          = cud['cpu_processes']
-        threads_per_task = cud['cpu_threads']
-        gpus_per_task    = cud['gpu_processes']
+        # os.environ['SLURM_CPU_BIND'] = 'verbose'
 
         # use `--exclusive` to ensure all tasks get individual resources.
-        mapping = '--exclusive '                           \
-                + '--ntasks %d '        % n_tasks          \
-                + '--cpus-per-task %d ' % threads_per_task \
-                + '--gpus-per-task %d'  % gpus_per_task
+        mapping = '--exclusive '          \
+                + '--nodes %d ' % n_nodes \
+                + '--ntasks %d' % n_tasks
 
-        if slots:
-
-            # the scheduler *did* place tasks - we can't honor the core and gpu
-            # mapping (see above), but we at least honor the nodelist.
-            nodelist = [node['name'] for node in slots['nodes']]
-            nodefile = '%s/%s.nodes' % (sbox, uid)
-            with open(nodefile, 'w') as fout:
-                fout.write(','.join(set(nodelist)))
-                fout.write('\n')
-
-            mapping += ' --nodes %d'    % len(slots['nodes']) \
-                     + ' --nodelist=%s' % nodefile
-
-        else:
-
-            mapping += ' --nodes %d' % int(
-                math.ceil(n_tasks / float(self._cfg.get('cores_per_node', 1))))
-
-        cmd = '%s %s %s %s' % (self.launch_command, mapping, env, task_cmd)
+        cmd = '%s %s %s' % (self.launch_command, mapping, task_cmd)
         return cmd, None
 
 
 # ------------------------------------------------------------------------------
-
