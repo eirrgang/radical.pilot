@@ -108,8 +108,12 @@ class Srun(LaunchMethod):
         # os.environ['SLURM_CPU_BIND'] = 'verbose'
 
         # use `--exclusive` to ensure all tasks get individual resources.
-        mapping = '--exclusive '          \
-                + '--nodes %d ' % n_nodes \
+        # mapping = '--exclusive '          \
+
+        # temporary remove exclusive-option considering that the whole memory
+        # might be provided to the task, thus only one task will be assigned
+        # to every requested node
+        mapping = '--nodes %d ' % n_nodes \
                 + '--ntasks %d' % n_tasks
 
         cmd = '%s %s %s' % (self.launch_command, mapping, task_cmd)
