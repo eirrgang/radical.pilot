@@ -49,7 +49,14 @@ class IBRun(LaunchMethod):
 
         # consider external environment variable that is set manually
         # and reflects how many actual tasks per node were submitted
-        cpn = os.environ.get('TACC_TASKS_PER_NODE') or self._cfg.cores_per_node
+        # (env is not set yet and is located in pre_exec list)
+        tacc_tasks_per_node = None
+        for pre_exec_cmd in cud.get('pre_exec', []):
+            if 'TACC_TASKS_PER_NODE=' in pre_exec_cmd:
+                tacc_tasks_per_node = int(pre_exec_cmd.split('=')[1])
+                break
+
+        cpn = tacc_tasks_per_node or self._cfg.cores_per_node
         index = 0
         offsets = list()
 
