@@ -33,7 +33,9 @@ class IBRun(LaunchMethod):
     def _configure(self):
 
         # ibrun: wrapper for mpirun at TACC
-        self.launch_command = ru.which('ibrun')
+        # FIXME: env variable RADICAL_PILOT_IBRUN_EXEC is used for tests
+        self.launch_command = os.environ.get('RADICAL_PILOT_IBRUN_EXEC') or \
+                              ru.which('ibrun')
 
 
     # --------------------------------------------------------------------------
@@ -52,7 +54,7 @@ class IBRun(LaunchMethod):
         # (env is not set yet and is located in pre_exec list)
         tacc_tasks_per_node = None
         for pre_exec_cmd in cud.get('pre_exec', []):
-            if 'TACC_TASKS_PER_NODE=' in pre_exec_cmd:
+            if 'TACC_TASKS_PER_NODE' in pre_exec_cmd:
                 tacc_tasks_per_node = int(pre_exec_cmd.split('=')[1])
                 break
 
